@@ -40,3 +40,9 @@ a {
     color-scheme: dark;
   }
 }
+
+/* Hilangkan margin top semua h2 dan Title level={2} */
+h2,
+.ant-typography-h2 {
+  margin-top: 0 !important;
+}
