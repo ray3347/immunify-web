@@ -2,16 +2,21 @@
 
 import { useRouter, useParams } from "next/navigation";
 import { useEffect } from "react";
-  import { Button, Tag, Typography, Breadcrumb, Table, Row, Col } from "antd";
+  import { Button, Tag, Typography, Breadcrumb, Table, Row, Col, TableColumnsType } from "antd";
 import useAppointmentStore from "../../../../../store/appointmentStore";
+import { useActiveSession } from "../../../../utilities/zustand";
+import { appointmentStatusTypes } from "../../../../constants/types";
+import { IVaccinationHistory } from "../../../../interfaces/db/IUser";
+import { completeAppointment } from "../util";
 
 const { Title } = Typography;
 
 export default function AppointmentDetail() {
   const router = useRouter();
   const params = useParams();
-  const { appointments, updateStatus } = useAppointmentStore();
-  const appointment = appointments.find((a) => a.key === params.id);
+  const { activeAccount } = useActiveSession();
+  // const { appointments, updateStatus } = useAppointmentStore();
+  const appointment = activeAccount?.clinic.scheduledAppointments.find((a) => a.id === params.id);
 
   // useEffect(() => {
   //   // Redirect jika appointment tidak ditemukan atau status bukan Approved
@@ -20,10 +25,12 @@ export default function AppointmentDetail() {
   //   }
   // }, [appointment, router]);
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     if (appointment) {
-      updateStatus(appointment.key, "Completed");
+      await completeAppointment(activeAccount?.id ?? "", appointment.id)
+      // updateStatus(appointment.id, "Completed");
       router.replace("/dashboard/appointments/history");
+      window.location.reload();
     }
   };
 
@@ -35,6 +42,33 @@ export default function AppointmentDetail() {
     const diff = new Date().getTime() - new Date(dob).getTime();
     return `${Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000))} years`;
   };
+
+  const columns : TableColumnsType<IVaccinationHistory> = [
+    {
+      title: "Vaccine",
+      // dataIndex: "vaccineType",
+      // key: "vaccineType",
+      render: (_, record) => (
+        <span style={{ fontWeight: 500 }}>{record.vaccine.vaccineName}</span>
+      ),
+    },
+    {
+      title: "Date",
+      // dataIndex: "vaccineType",
+      // key: "vaccineType",
+      render: (_, record) => (
+        <span style={{ fontWeight: 500 }}>{record.vaccinationDate.toISOString()}</span>
+      ),
+    },
+    {
+      title: "Dose",
+      // dataIndex: "vaccineType",
+      // key: "vaccineType",
+      render: (_, record) => (
+        <span style={{ fontWeight: 500 }}>{record.doseNumber}</span>
+      ),
+    },
+  ]
 
   return (
     <div style={{ padding: 24, background: "#fff" }}>
@@ -63,23 +97,23 @@ export default function AppointmentDetail() {
           <Col xs={24} md={14}>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <div style={{ fontWeight: 600, fontSize: 18 }}>
-                {appointment.patientName}
+                {appointment.user.fullName}
               </div>
               <div style={{ color: "#888", fontSize: 15, marginBottom: 8 }}>
-                {appointment.patientId}
+                {appointment.user.id}
               </div>
               <div style={{ display: "flex", gap: 40, flexWrap: "wrap" }}>
                 <div>
                   <div style={{ color: "#888", fontSize: 14 }}>Gender</div>
-                  <div style={{ fontWeight: 500 }}>{appointment.gender || "-"}</div>
+                  <div style={{ fontWeight: 500 }}>{appointment.user.gender || "-"}</div>
                 </div>
                 <div>
                   <div style={{ color: "#888", fontSize: 14 }}>Date of Birth</div>
-                  <div style={{ fontWeight: 500 }}>{appointment.dob || "-"}</div>
+                  <div style={{ fontWeight: 500 }}>{appointment.user.dateOfBirth.toISOString() || "-"}</div>
                 </div>
                 <div>
                   <div style={{ color: "#888", fontSize: 14 }}>Age</div>
-                  <div style={{ fontWeight: 500 }}>{getAge(appointment.dob)}</div>
+                  <div style={{ fontWeight: 500 }}>{getAge(appointment.user.dateOfBirth.toISOString())}</div>
                 </div>
               </div>
             </div>
@@ -87,11 +121,11 @@ export default function AppointmentDetail() {
           <Col xs={24} md={10} style={{ textAlign: "right", marginTop: 12 }}>
             <Tag
               color={
-                appointment.status === "Pending"
+                appointment.status === appointmentStatusTypes.pending
                   ? "#faad14"
-                  : appointment.status === "Scheduled"
+                  : appointment.status === appointmentStatusTypes.scheduled
                   ? "#1677ff"
-                  : appointment.status === "Rejected"
+                  : appointment.status === appointmentStatusTypes.cancelled
                   ? "#ff4d4f"
                   : "#52c41a"
               }
@@ -126,17 +160,17 @@ export default function AppointmentDetail() {
         <Row gutter={16}>
           <Col xs={24} md={8}>
             <div style={{ marginBottom: 12 }}>
-              <strong>Vaccine Name:</strong> <span style={{ marginLeft: 8 }}>{appointment.vaccineType}</span>
+              <strong>Vaccine Name:</strong> <span style={{ marginLeft: 8 }}>{appointment.vaccine.vaccineName}</span>
             </div>
           </Col>
           <Col xs={24} md={8}>
             <div style={{ marginBottom: 12 }}>
-              <strong>Preferred Date:</strong> <span style={{ marginLeft: 8 }}>{appointment.preferredDate}</span>
+              <strong>Preferred Date:</strong> <span style={{ marginLeft: 8 }}>{appointment.scheduledDate.toISOString()}</span>
             </div>
           </Col>
           <Col xs={24} md={8}>
             <div style={{ marginBottom: 12 }}>
-              <strong>Preferred Time:</strong> <span style={{ marginLeft: 8 }}>{appointment.preferredTime}</span>
+              <strong>Preferred Time:</strong> <span style={{ marginLeft: 8 }}>{appointment.scheduledTime}</span>
             </div>
           </Col>
         </Row>
@@ -154,16 +188,17 @@ export default function AppointmentDetail() {
         }}
       >
         <Title level={4} style={{ marginBottom: 20 }}>Vaccination History</Title>
-        {appointment.vaccinationHistory && appointment.vaccinationHistory.length > 0 ? (
+        {appointment.user.vaccinationHistory && appointment.user.vaccinationHistory.length > 0 ? (
           <Table
-            dataSource={appointment.vaccinationHistory.map((v, idx) => ({ ...v, key: idx }))}
+            dataSource={appointment.user.vaccinationHistory.map((v, idx) => ({ ...v, key: idx }))}
             pagination={false}
             size="small"
-            columns={[
-              { title: "Vaccine Name", dataIndex: "name", key: "name" },
-              { title: "Date", dataIndex: "date", key: "date" },
-              { title: "Dose", dataIndex: "dose", key: "dose" },
-            ]}
+            // columns={[
+            //   { title: "Vaccine Name", dataIndex: "name", key: "name" },
+            //   { title: "Date", dataIndex: "date", key: "date" },
+            //   { title: "Dose", dataIndex: "dose", key: "dose" },
+            // ]}
+            columns={columns}
              style={{
               margin: 0,
               marginBottom: 24,

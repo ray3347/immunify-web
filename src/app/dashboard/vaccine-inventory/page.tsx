@@ -1,10 +1,30 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Table, Select, InputNumber, Button, Space, Typography, Popconfirm, notification, Input, Tag, Modal, Form } from "antd";
+import {
+  Table,
+  Select,
+  InputNumber,
+  Button,
+  Space,
+  Typography,
+  Popconfirm,
+  notification,
+  Input,
+  Tag,
+  Modal,
+  Form,
+} from "antd";
 import useVaccineInventoryStore from "../../../../store/vaccineInventoryStore";
 import { Vaccine } from "@/type";
-import '@ant-design/v5-patch-for-react-19';
-import { message, notification as customNotification } from '../../../../store/message';
+import "@ant-design/v5-patch-for-react-19";
+import {
+  message,
+  notification as customNotification,
+} from "../../../../store/message";
+import { useActiveSession } from "../../../utilities/zustand";
+import { IVaccineStock } from "../../../interfaces/db/IClinic";
+import { IVaccine } from "../../../interfaces/db/IVaccine";
+import { getVaccineList, modifyVaccineStock } from "./util";
 
 const { Option } = Select;
 const { Title } = Typography;
@@ -13,8 +33,8 @@ const dummyVaccines: Vaccine[] = [
   { id: "v1", name: "MMR", clinicId: "c1" },
   { id: "v2", name: "Hepatitis B", clinicId: "c1" },
   { id: "v3", name: "Polio", clinicId: "c1" },
-  { id: "v4", name: "COVID-19 Booster", clinicId: "c1" }, 
-  { id: "v5", name: "HPV Vaccine", clinicId: "c1" },             
+  { id: "v4", name: "COVID-19 Booster", clinicId: "c1" },
+  { id: "v5", name: "HPV Vaccine", clinicId: "c1" },
 ];
 
 const dummyStocks = [
@@ -26,7 +46,10 @@ const dummyStocks = [
 ];
 
 export default function VaccineInventoryPage() {
-  const { vaccines, stocks, addStock, setVaccines, setStocks } = useVaccineInventoryStore();
+  // const { vaccines, stocks, addStock, setVaccines, setStocks } = useVaccineInventoryStore();
+
+  const { activeAccount, switchAccount } = useActiveSession();
+
   const [selectedVaccine, setSelectedVaccine] = useState<string>("");
   const [qty, setQty] = useState<number>(1);
   const [mounted, setMounted] = useState(false);
@@ -34,42 +57,69 @@ export default function VaccineInventoryPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingQty, setEditingQty] = useState<number>(0);
+  const [allVaccineList, setAllVaccineList] = useState<IVaccine[]>([]);
 
   useEffect(() => {
-    if (vaccines.length === 0) setVaccines(dummyVaccines);
-    if (stocks.length === 0) setStocks(dummyStocks);
+    // if (vaccines.length === 0) setVaccines(dummyVaccines);
+    // if (stocks.length === 0) setStocks(dummyStocks);
     setMounted(true);
   }, []);
 
-  const handleAddStock = () => {
+  const handleAddStock = async () => {
     if (selectedVaccine && qty > 0) {
-      addStock(selectedVaccine, qty);
-      message.success('Success!');
-      setModalOpen(false);
-      setSelectedVaccine("");
-      setQty(1);
+      // addStock(selectedVaccine, qty);
+      const vaccine = allVaccineList.find((v) => v.id == selectedVaccine);
+      if (vaccine) {
+        const body: IVaccineStock = {
+          id: "",
+          stock: qty,
+          vaccine: vaccine,
+        };
+        await modifyVaccineStock(activeAccount?.id ?? "", body);
+        message.success("Success!");
+        setModalOpen(false);
+        setSelectedVaccine("");
+      }
+      window.location.reload();
+      // setQty(1);
+
+      // call api modify stock
     }
   };
 
-  
   // Filter vaccines by search
-  const filteredVaccines = vaccines.filter(v =>
-    v.name.toLowerCase().includes(search.toLowerCase())
+  const filteredVaccines = activeAccount?.clinic.availableVaccines.filter((v) =>
+    v.vaccine.vaccineName.toLowerCase().includes(search.toLowerCase())
   );
 
   const handleEditClick = (vaccineId: string) => {
-    const stock = stocks.find(s => s.vaccineId === vaccineId)?.quantity ?? 0;
+    const stock =
+      activeAccount?.clinic.availableVaccines.find((s) => s.id === vaccineId)
+        ?.stock ?? 0;
     setEditingId(vaccineId);
     setEditingQty(stock);
   };
 
-  const handleSaveClick = (vaccineId: string) => {
-    setStocks(
-      stocks.map(stock =>
-        stock.vaccineId === vaccineId ? { ...stock, quantity: editingQty } : stock
-      )
+  const handleSaveClick = async (vaccineId: string) => {
+    // setStocks(
+    //   stocks.map(stock =>
+    //     stock.vaccineId === vaccineId ? { ...stock, quantity: editingQty } : stock
+    //   )
+    // );
+
+    // call api modify stock and get clinic by id
+    const vaccine = activeAccount?.clinic.availableVaccines.find(
+      (v) => v.id == vaccineId
     );
+    if (vaccine) {
+      const updateVaccine = {
+        ...vaccine,
+        stock: editingQty,
+      };
+      await modifyVaccineStock(activeAccount?.id ?? "", updateVaccine);
+    }
     setEditingId(null);
+    window.location.reload();
   };
 
   const columns = [
@@ -77,19 +127,28 @@ export default function VaccineInventoryPage() {
       title: "Vaccine Name",
       dataIndex: "name",
       key: "name",
+      render: (_: any, record: IVaccineStock) => {
+        const name = activeAccount?.clinic.availableVaccines.find(
+          (s) => s.id === record.id
+        )?.vaccine.vaccineName;
+        return name;
+      },
     },
     {
       title: "Stock",
       dataIndex: "stock",
       key: "stock",
-      render: (_: any, record: Vaccine) => {
-        const stock = stocks.find(s => s.vaccineId === record.id)?.quantity ?? 0;
+      render: (_: any, record: IVaccineStock) => {
+        const stock =
+          activeAccount?.clinic.availableVaccines.find(
+            (s) => s.id === record.id
+          )?.stock ?? 0;
         if (editingId === record.id) {
           return (
             <InputNumber
               min={0}
               value={editingQty}
-              onChange={value => setEditingQty(Number(value))}
+              onChange={(value) => setEditingQty(Number(value))}
               style={{ width: 100 }}
             />
           );
@@ -100,8 +159,11 @@ export default function VaccineInventoryPage() {
     {
       title: "Status",
       key: "status",
-      render: (_: any, record: Vaccine) => {
-        const stock = stocks.find(s => s.vaccineId === record.id)?.quantity ?? 0;
+      render: (_: any, record: IVaccineStock) => {
+        const stock =
+          activeAccount?.clinic.availableVaccines.find(
+            (s) => s.id === record.id
+          )?.stock ?? 0;
         if (stock === 0) {
           return <Tag color="red">No Stock</Tag>;
         } else if (stock <= 20) {
@@ -114,27 +176,33 @@ export default function VaccineInventoryPage() {
     {
       title: "Actions",
       key: "actions",
-      render: (_: any, record: Vaccine) => (
+      render: (_: any, record: IVaccineStock) =>
         editingId === record.id ? (
           <Button type="primary" onClick={() => handleSaveClick(record.id)}>
             Save
           </Button>
         ) : (
-          <Button onClick={() => handleEditClick(record.id)}>
-            Edit
-          </Button>
-        )
-      ),
+          <Button onClick={() => handleEditClick(record.id)}>Edit</Button>
+        ),
     },
   ];
 
-  if (!mounted) return null; 
+  if (!mounted) return null;
 
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
-        <Title level={3} style={{ margin: 0, marginBottom: 0, flex: 1 }}>Vaccine Inventory</Title>
-        <Button type="primary" onClick={() => setModalOpen(true)}>
+        <Title level={3} style={{ margin: 0, marginBottom: 0, flex: 1 }}>
+          Vaccine Inventory
+        </Title>
+        <Button
+          type="primary"
+          onClick={async () => {
+            const vaccines = await getVaccineList();
+            setAllVaccineList(vaccines);
+            setModalOpen(true);
+          }}
+        >
           Add Stock
         </Button>
       </div>
@@ -142,7 +210,7 @@ export default function VaccineInventoryPage() {
         <Input
           placeholder="Search vaccine..."
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={(e) => setSearch(e.target.value)}
           style={{ width: 320 }}
           allowClear
         />
@@ -170,8 +238,13 @@ export default function VaccineInventoryPage() {
               value={selectedVaccine || undefined}
               onChange={setSelectedVaccine}
             >
-              {vaccines.map(v => (
+              {/* {vaccines.map(v => (
                 <Option key={v.id} value={v.id}>{v.name}</Option>
+              ))} */}
+              {allVaccineList.map((v) => (
+                <Option key={v.id} value={v.id}>
+                  {v.vaccineName}
+                </Option>
               ))}
             </Select>
           </Form.Item>
@@ -179,7 +252,7 @@ export default function VaccineInventoryPage() {
             <InputNumber
               min={1}
               value={qty}
-              onChange={value => setQty(Number(value))}
+              onChange={(value) => setQty(Number(value))}
               style={{ width: "100%" }}
             />
           </Form.Item>

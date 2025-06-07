@@ -22,6 +22,10 @@ import { Table as AntdTable } from "antd";
 
 import '@ant-design/v5-patch-for-react-19';
 import { message, notification as customNotification, modal as customModal } from '../../../../store/message';
+import { useActiveSession } from "../../../utilities/zustand";
+import { IClinicAppointment } from "../../../interfaces/db/IAppointment";
+import { appointmentStatusTypes } from "../../../constants/types";
+import { allocateAppointment, cancelAppointment } from "./util";
 
 const { Title } = Typography;
 
@@ -347,78 +351,93 @@ const initialAppointments: Appointment[] = [
 
 const AppointmentsComponent: React.FC = () => {
   const router = useRouter();
-  const {
-    appointments,
-    setAppointments,
-    updateStatusAndStock,
-  } = useAppointmentStore();
+  // const {
+  //   appointments,
+  //   setAppointments,
+  //   updateStatusAndStock,
+  // } = useAppointmentStore();
+  const {activeAccount} = useActiveSession();
 
   const [mounted, setMounted] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>("pending");
-  const [filteredData, setFilteredData] = useState<Appointment[]>([]);
+  const [filteredData, setFilteredData] = useState<IClinicAppointment[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<Appointment | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState<IClinicAppointment | null>(null);
 
   useEffect(() => {
     setMounted(true);
     // Cek jika localStorage benar-benar kosong (hanya untuk inisialisasi pertama)
-    if (appointments.length === 0 && !localStorage.getItem("appointments")) {
-      setAppointments(initialAppointments);
-    }
+    // if (activeAccount?.clinic.scheduledAppointments.length === 0 && !localStorage.getItem("appointments")) {
+    //   setAppointments(initialAppointments);
+    // }
     // eslint-disable-next-line
   }, []);
 
   useEffect(() => {
     if (!mounted) return;
-    let filtered: Appointment[];
+    let filtered: IClinicAppointment[];
     switch (activeTab) {
       case "pending":
-        filtered = appointments.filter((item) => item.status === "Pending");
+        filtered = activeAccount?.clinic.scheduledAppointments.filter((item) => item.status === appointmentStatusTypes.pending) ?? [];
         break;
       case "scheduled": // ubah dari "approve"
-        filtered = appointments.filter((item) => item.status === "Scheduled");
+        filtered = activeAccount?.clinic.scheduledAppointments.filter((item) => item.status === appointmentStatusTypes.scheduled) ?? [];
         break;
       case "reject":
-        filtered = appointments.filter((item) => item.status === "Rejected");
+        filtered = activeAccount?.clinic.scheduledAppointments.filter((item) => item.status === appointmentStatusTypes.cancelled) ?? [];
         break;
       default:
-        filtered = appointments;
+        filtered = activeAccount?.clinic.scheduledAppointments ?? [];
     }
     setFilteredData(filtered);
-  }, [activeTab, appointments, mounted]);
+  }, [activeTab, activeAccount?.clinic.scheduledAppointments, mounted]);
 
   const handleTabChange = (e: RadioChangeEvent): void => {
     setActiveTab(e.target.value);
   };
 
-  const handleApprove = (record: Appointment): void => {
-    const success = updateStatusAndStock(record.key, "Scheduled");
-    if (!success) {
-      customNotification.error({
-        message: "Approval Failed",
-        description: "Vaccine stock for this appointment is out of stock. Approval cannot be completed.",
-        placement: "topRight",
-      });
-    }
+  const handleApprove = (record: IClinicAppointment): void => {
+    // const success = updateStatusAndStock(record.id, "Scheduled");
+    // if (!success) {
+    //   customNotification.error({
+    //     message: "Approval Failed",
+    //     description: "Vaccine stock for this appointment is out of stock. Approval cannot be completed.",
+    //     placement: "topRight",
+    //   });
+    // }
+   customModal.confirm({
+      title: "Allocate and Verify Appointment",
+      content: "Are you sure you want to schedule this appointment?",
+      okText: "Yes, Schedule ",
+      okType: "primary",
+      cancelText: "Cancel",
+      onOk: async () => {
+        await allocateAppointment(activeAccount?.id ?? "", record.id)
+        window.location.reload();
+        // updateStatusAndStock(record.id, "Rejected");
+      },
+    });
   };
 
-  const handleReject = (record: Appointment): void => {
+  const handleReject = (record: IClinicAppointment): void => {
     customModal.confirm({
       title: "Reject Appointment",
       content: "Are you sure you want to reject this appointment?",
       okText: "Yes, Reject",
       okType: "danger",
       cancelText: "Cancel",
-      onOk: () => {
-        updateStatusAndStock(record.key, "Rejected");
+      onOk: async () => {
+        await cancelAppointment(activeAccount?.id ?? "", record.id);
+        window.location.reload();
+        // updateStatusAndStock(record.id, "Rejected");
       },
     });
   };
 
-  const handleView = (record: Appointment): void => {
+  const handleView = (record: IClinicAppointment): void => {
     // Redirect both "Scheduled" and "Pending" to patient information page
-    if (record.status === "Scheduled" || record.status === "Pending") {
-      router.push(`/dashboard/appointments/${record.key}`);
+    if (record.status === appointmentStatusTypes.scheduled || record.status === appointmentStatusTypes.pending) {
+      router.push(`/dashboard/appointments/${record.id}`);
     } else {
       setSelectedPatient(record);
       setIsModalVisible(true);
@@ -430,19 +449,19 @@ const AppointmentsComponent: React.FC = () => {
     setSelectedPatient(null);
   };
 
-  const allCount = appointments.length;
-  const pendingCount = appointments.filter(
+  const allCount = activeAccount?.clinic.scheduledAppointments.length;
+  const pendingCount = activeAccount?.clinic.scheduledAppointments.filter(
     (item) => item.status === "Pending"
   ).length;
-  const scheduledCount = appointments.filter(
+  const scheduledCount = activeAccount?.clinic.scheduledAppointments.filter(
     (item) => item.status === "Scheduled"
   ).length;
-  const rejectedCount = appointments.filter(
+  const rejectedCount = activeAccount?.clinic.scheduledAppointments.filter(
     (item) => item.status === "Rejected"
   ).length;
 
   // Table columns
-  const columns: TableColumnsType<Appointment> = [
+  const columns: TableColumnsType<IClinicAppointment> = [
     {
       title: "Patient",
       dataIndex: "patientName",
@@ -450,9 +469,9 @@ const AppointmentsComponent: React.FC = () => {
       render: (_, record) => (
         <Space>
           <div>
-            <div style={{ fontWeight: 500 }}>{record.patientName}</div>
+            <div style={{ fontWeight: 500 }}>{record.user.fullName}</div>
             <div style={{ color: "#868e96", fontSize: "12px" }}>
-              {record.patientId}
+              {record.user.id}
             </div>
           </div>
         </Space>
@@ -462,19 +481,25 @@ const AppointmentsComponent: React.FC = () => {
       title: "Vaccine",
       dataIndex: "vaccineType",
       key: "vaccineType",
-      render: (vaccineType: string) => (
-        <span style={{ fontWeight: 500 }}>{vaccineType}</span>
+      render: (_, record) => (
+        <span style={{ fontWeight: 500 }}>{record.vaccine.vaccineName}</span>
       ),
     },
     {
       title: "Preferred Date",
       dataIndex: "preferredDate",
       key: "preferredDate",
+      render: (_, record) => (
+        <span style={{ fontWeight: 500 }}>{record.scheduledDate.toISOString()}</span>
+      ),
     },
     {
       title: "Preferred Time",
       dataIndex: "preferredTime",
       key: "preferredTime",
+      render: (_, record) => (
+        <span style={{ fontWeight: 500 }}>{record.scheduledTime}</span>
+      ),
     },
     {
       title: "Status",
@@ -570,16 +595,16 @@ const AppointmentsComponent: React.FC = () => {
                   "Gender",
                   "Date of Birth"
                 ],
-                ...appointments.map(a => [
-                  a.patientName,
-                  a.patientId,
-                  a.vaccineType,
-                  a.preferredDate,
-                  a.preferredTime,
+                ...activeAccount?.clinic.scheduledAppointments.map(a => [
+                  a.user.fullName,
+                  a.user.id,
+                  a.vaccine.vaccineName,
+                  a.scheduledDate,
+                  a.scheduledTime,
                   a.status,
-                  a.gender,
-                  a.dob
-                ])
+                  a.user.gender,
+                  a.user.dateOfBirth
+                ]) ?? []
               ];
               const csvContent = csvRows.map(e => e.join(",")).join("\n");
               const blob = new Blob([csvContent], { type: "text/csv" });
@@ -641,8 +666,8 @@ const AppointmentsComponent: React.FC = () => {
               <div>
                 <div style={{ display: "flex", alignItems: "center", marginBottom: 24 }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 18 }}>{selectedPatient.patientName}</div>
-                    <div style={{ color: "#868e96", fontSize: 14 }}>{selectedPatient.patientId}</div>
+                    <div style={{ fontWeight: 600, fontSize: 18 }}>{selectedPatient.user.fullName}</div>
+                    <div style={{ color: "#868e96", fontSize: 14 }}>{selectedPatient.user.id}</div>
                   </div>
                 </div>
                 <Descriptions
@@ -655,21 +680,21 @@ const AppointmentsComponent: React.FC = () => {
                   }}
                 >
                   <Descriptions.Item label="Gender">
-                    {selectedPatient.gender || "-"}
+                    {selectedPatient.user.gender || "-"}
                   </Descriptions.Item>
                   <Descriptions.Item label="Date of Birth">
-                    {selectedPatient.dob || "-"}
+                    {selectedPatient.user.dateOfBirth.toISOString() || "-"}
                   </Descriptions.Item>
                   <Descriptions.Item label="Age">
-                    {selectedPatient.dob
+                    {selectedPatient.user.dateOfBirth
                       ? `${Math.floor(
-                          (new Date().getTime() - new Date(selectedPatient.dob).getTime()) /
+                          (new Date().getTime() - new Date(selectedPatient.user.dateOfBirth).getTime()) /
                             (365.25 * 24 * 60 * 60 * 1000)
                         )} years`
                       : "-"}
                   </Descriptions.Item>
                   <Descriptions.Item label="Vaccine Type">
-                    {selectedPatient.vaccineType}
+                    {selectedPatient.vaccine.vaccineName}
                   </Descriptions.Item>
                   <Descriptions.Item label="Status">
                     <Tag color={

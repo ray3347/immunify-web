@@ -6,6 +6,8 @@ import type { Dayjs } from 'dayjs';
 import useAppointmentStore from '../../../../store/appointmentStore';
 import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
+import { useActiveSession } from '../../../utilities/zustand';
+import { appointmentStatusTypes } from '../../../constants/types';
 
 const { Title, Text } = Typography;
 
@@ -28,7 +30,8 @@ function ClientOnly({ children }: { children: React.ReactNode }) {
 }
 
 export default function VaccinationCalendar() {
-  const { appointments } = useAppointmentStore();
+  // const { appointments } = useAppointmentStore();
+  const {activeAccount} = useActiveSession();
   const router = useRouter();
 
   // State for search and calendar navigation
@@ -36,26 +39,26 @@ export default function VaccinationCalendar() {
   const [currentDate, setCurrentDate] = useState<Dayjs | undefined>(undefined);
 
   // Filter appointments: only scheduled and match search
-  const filteredAppointments = appointments.filter(apt =>
-    apt.status?.toLowerCase() === 'scheduled' &&
+  const filteredAppointments = activeAccount?.clinic.scheduledAppointments.filter(apt =>
+    apt.status?.toLowerCase() === appointmentStatusTypes.scheduled &&
     (
-      apt.patientName?.toLowerCase().includes(search.toLowerCase()) ||
-      apt.vaccineType?.toLowerCase().includes(search.toLowerCase())
+      apt.user.fullName?.toLowerCase().includes(search.toLowerCase()) ||
+      apt.vaccine.vaccineName?.toLowerCase().includes(search.toLowerCase())
     )
   );
 
   // Calendar cell renderer
   const dateCellRender = (value: Dayjs) => {
     const dateStr = value.format('YYYY-MM-DD');
-    const listData = filteredAppointments.filter(item => {
-      const isoDate = toISODate(item.preferredDate);
+    const listData = filteredAppointments?.filter(item => {
+      const isoDate = item.scheduledDate.toISOString();
       return isoDate === dateStr;
     });
 
     return (
       <ul style={{ padding: 0, margin: 0, listStyle: 'none' }}>
-        {listData.map(item => (
-          <li key={item.key} style={{ marginBottom: '4px', cursor: 'pointer' }}>
+        {listData?.map(item => (
+          <li key={item.id} style={{ marginBottom: '4px', cursor: 'pointer' }}>
             <div
               style={{
                 backgroundColor: "#fffbe7",
@@ -64,10 +67,10 @@ export default function VaccinationCalendar() {
                 fontSize: '12px',
                 border: "1px solid #e0e0e0"
               }}
-              onClick={() => router.push(`/dashboard/appointments/${item.key}`)}
+              onClick={() => router.push(`/dashboard/appointments/${item.id}`)}
             >
-              <div style={{ fontWeight: 500 }}>{item.patientName}</div>
-              <div>{item.vaccineType} • {item.preferredTime}</div>
+              <div style={{ fontWeight: 500 }}>{item.user.fullName}</div>
+              <div>{item.vaccine.vaccineName} • {item.scheduledTime}</div>
             </div>
           </li>
         ))}
