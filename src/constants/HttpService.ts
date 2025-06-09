@@ -2,7 +2,7 @@ import axios from "axios";
 
 // Create axios instance with configurations
 const HttpService = axios.create({
-    baseURL: "http://localhost:7000",
+    baseURL: "https://immunify-api.vercel.app",
     timeout: 10000,
     headers: {
         'Authorization': "Bearer QlVfQUxWSU5BX05PXzE=",
