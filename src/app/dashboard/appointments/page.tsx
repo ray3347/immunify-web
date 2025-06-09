@@ -26,6 +26,7 @@ import { useActiveSession } from "../../../utilities/zustand";
 import { IClinicAppointment } from "../../../interfaces/db/IAppointment";
 import { appointmentStatusTypes } from "../../../constants/types";
 import { allocateAppointment, cancelAppointment } from "./util";
+import dayjs from "dayjs";
 
 const { Title } = Typography;
 
@@ -490,7 +491,7 @@ const AppointmentsComponent: React.FC = () => {
       dataIndex: "preferredDate",
       key: "preferredDate",
       render: (_, record) => (
-        <span style={{ fontWeight: 500 }}>{record.scheduledDate.toISOString()}</span>
+        <span style={{ fontWeight: 500 }}>{dayjs(record.scheduledDate).format('DD MMMM YYYY')}</span>
       ),
     },
     {
@@ -648,7 +649,7 @@ const AppointmentsComponent: React.FC = () => {
               columns={columns}
               dataSource={filteredData}
               pagination={{ pageSize: 5 }}
-              rowKey="key"
+              rowKey="id"
               style={{ borderRadius: "8px", overflow: "hidden" }}
               scroll={{ x: "max-content" }}
             />
@@ -683,7 +684,7 @@ const AppointmentsComponent: React.FC = () => {
                     {selectedPatient.user.gender || "-"}
                   </Descriptions.Item>
                   <Descriptions.Item label="Date of Birth">
-                    {selectedPatient.user.dateOfBirth.toISOString() || "-"}
+                    {dayjs(selectedPatient.user.dateOfBirth).format('DD MMMM YYYY')|| "-"}
                   </Descriptions.Item>
                   <Descriptions.Item label="Age">
                     {selectedPatient.user.dateOfBirth

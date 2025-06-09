@@ -8,6 +8,7 @@ import { useActiveSession } from "../../../../utilities/zustand";
 import { appointmentStatusTypes } from "../../../../constants/types";
 import { IVaccinationHistory } from "../../../../interfaces/db/IUser";
 import { completeAppointment } from "../util";
+import dayjs from "dayjs";
 
 const { Title } = Typography;
 
@@ -57,7 +58,7 @@ export default function AppointmentDetail() {
       // dataIndex: "vaccineType",
       // key: "vaccineType",
       render: (_, record) => (
-        <span style={{ fontWeight: 500 }}>{record.vaccinationDate.toISOString()}</span>
+        <span style={{ fontWeight: 500 }}>{dayjs(record.vaccinationDate).format('DD MMMM YYYY')}</span>
       ),
     },
     {
@@ -109,11 +110,11 @@ export default function AppointmentDetail() {
                 </div>
                 <div>
                   <div style={{ color: "#888", fontSize: 14 }}>Date of Birth</div>
-                  <div style={{ fontWeight: 500 }}>{appointment.user.dateOfBirth.toISOString() || "-"}</div>
+                  <div style={{ fontWeight: 500 }}>{dayjs(appointment.user.dateOfBirth).format('DD MMMM YYYY') || "-"}</div>
                 </div>
                 <div>
                   <div style={{ color: "#888", fontSize: 14 }}>Age</div>
-                  <div style={{ fontWeight: 500 }}>{getAge(appointment.user.dateOfBirth.toISOString())}</div>
+                  <div style={{ fontWeight: 500 }}>{getAge(appointment.user.dateOfBirth.toString())}</div>
                 </div>
               </div>
             </div>
@@ -165,7 +166,7 @@ export default function AppointmentDetail() {
           </Col>
           <Col xs={24} md={8}>
             <div style={{ marginBottom: 12 }}>
-              <strong>Preferred Date:</strong> <span style={{ marginLeft: 8 }}>{appointment.scheduledDate.toISOString()}</span>
+              <strong>Preferred Date:</strong> <span style={{ marginLeft: 8 }}>{dayjs(appointment.scheduledDate).format('DD MMMM YYYY')}</span>
             </div>
           </Col>
           <Col xs={24} md={8}>
