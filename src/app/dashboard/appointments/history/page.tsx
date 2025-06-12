@@ -6,6 +6,7 @@ import useAppointmentStore, {Appointment} from "../../../../../store/appointment
 import { useActiveSession } from "../../../../utilities/zustand";
 import { IClinicAppointment } from "../../../../interfaces/db/IAppointment";
 import { appointmentStatusTypes } from "../../../../constants/types";
+import dayjs from "dayjs";
 const { Title } = Typography;
 
 export default function AppointmentHistory() {
@@ -47,7 +48,7 @@ export default function AppointmentHistory() {
       dataIndex: "preferredDate",
       key: "preferredDate",
       render: (_, record) => (
-        <span style={{ fontWeight: 500 }}>{record.scheduledDate.toISOString()}</span>
+        <span style={{ fontWeight: 500 }}>{dayjs(record.scheduledDate).format('DD MMMM YYYY')}</span>
       ),
     },
     {
