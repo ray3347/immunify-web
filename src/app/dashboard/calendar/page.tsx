@@ -51,7 +51,7 @@ export default function VaccinationCalendar() {
   const dateCellRender = (value: Dayjs) => {
     const dateStr = value.format('YYYY-MM-DD');
     const listData = filteredAppointments?.filter(item => {
-      const isoDate = item.scheduledDate.toISOString();
+      const isoDate = dayjs(item.scheduledDate).format('YYYY-MM-DD');
       return isoDate === dateStr;
     });
 
