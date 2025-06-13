@@ -149,7 +149,7 @@ const AppointmentsComponent: React.FC = () => {
     (item) => item.status === appointmentStatusTypes.pending
   ).length;
   const scheduledCount = activeAccount?.clinic.scheduledAppointments.filter(
-    (item) => item.status === appointmentStatusTypes.completed
+    (item) => item.status === appointmentStatusTypes.scheduled
   ).length;
   const rejectedCount = activeAccount?.clinic.scheduledAppointments.filter(
     (item) => item.status === appointmentStatusTypes.cancelled
