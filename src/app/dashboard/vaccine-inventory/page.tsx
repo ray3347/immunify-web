@@ -199,7 +199,7 @@ export default function VaccineInventoryPage() {
           type="primary"
           onClick={async () => {
             const vaccines = await getVaccineList();
-            setAllVaccineList(vaccines);
+            setAllVaccineList(vaccines.filter(v => !activeAccount?.clinic.availableVaccines.some(a => a.vaccine.id == v.id)));
             setModalOpen(true);
           }}
         >
